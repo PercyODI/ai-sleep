@@ -10,28 +10,20 @@ import * as _ from "lodash"
 const main = async () => {
   const model = new OpenAI({
     openAIApiKey: process.env["OPENAPI_KEY"]!,
+    modelName: "gpt-3.5-turbo-1106"
   });
-
+  
   const memory = new BufferMemory();
 
   const prompt = new PromptTemplate({
     template: `
-    Write a "Sleep Cast" that can be listened to to help people fall asleep. A
-    A Sleep Cast is like a podcast, where it is an audio experience that people listen to to fall asleep. 
-    The Sleep Cast should follow these rules:
-    1. It is a long, winding story. 
-    2. It uses very simple vocabulary. It should be at a kindergarten level people don't have to think too hard while falling asleep.
-    3. It describes things in more detail than normal. For example: "There was confetti all over the road. There was red, green, blue, purple, yellow, and white confetti."
-    4. It uses excessive descriptions. For example: "The candle was lit, a bright yellow flickering flame was burning gently and fully in it's vanilla, off-white wax.
-    5. It should be appropriate for people with afantasia. Don't ask someone to imagine or visualize something, because they can't.
-    
-    The Sleep Cast will consist of 5 chapters. I will request each chapter individually. For now, simply give a short synopsis of the Sleep Cast you are about to write.
-
-    Each Chapter should start with "Chapter <chapter number>: <chapter title>".
+    {systemInstruction}
 
     Theme of this Sleep Cast: {theme}
+
+    Give a short synopsis of the Sleep Cast you are about to write.
   `.trim(),
-    inputVariables: ["theme"],
+    inputVariables: ["theme", "systemInstruction"],
   });
 
   const synopsisChain = new LLMChain({
@@ -42,30 +34,31 @@ const main = async () => {
   });
 
   const herosJourneyPrompt = (chaptNum: number, step: string) => {
-    let storySoFar = "";
-    if (chaptNum > 0) {
-      storySoFar = `Story So Far: ${_.range(chaptNum - 1)
-        .map((n) => `{chapter-${n}}`)
-        .join("\n")}`;
-    }
+    // let storySoFar = "";
+    // if (chaptNum > 0) {
+    //   storySoFar = `Story So Far: ${_.range(chaptNum - 1)
+    //     .map((n) => `{chapter-${n}}`)
+    //     .join("\n")}`;
+    // }
 
-    const inputStorySoFarInputVariables =
-      chaptNum > 0
-        ? _.range(chaptNum - 1).map((n) => `chapter-${n}`)
-        : [];
+    // const inputStorySoFarInputVariables =
+    //   chaptNum > 0
+    //     ? _.range(chaptNum - 1).map((n) => `chapter-${n}`)
+    //     : [];
 
     return new PromptTemplate({
       template: `
-    It is time to write chapter ${chaptNum}.
+      {systemInstruction}
 
-    Story Synopsis: {synopsis}
-    ${storySoFar}
+      It is time to write chapter ${chaptNum}.
 
-    Remember that we are using the hero's journey. This chapter is responsible for ${step}
+      Story Synopsis: {synopsis}
 
-    Write this chapter in the Sleep Cast.
+      Remember that we are using the hero's journey. This chapter is responsible for ${step}
+
+      Write chapter ${chaptNum} in the Sleep Cast.
   `.trim(),
-      inputVariables: ["synopsis", ...inputStorySoFarInputVariables],
+      inputVariables: ["synopsis", "systemInstruction"],
     });
   };
 
@@ -89,13 +82,30 @@ const main = async () => {
           })
       )
     ],
-    inputVariables: ["theme"],
+    inputVariables: ["theme", "systemInstruction"],
     verbose: true,
     returnAll: true
   });
 
   const sleepCastExecutionResult = await sleepCastChain.call({
     theme: "Fantasy Tavern Owner",
+    systemInstruction: `
+    Write a "Sleep Cast" that can be listened to to help people fall asleep.
+    A Sleep Cast is like a podcast, where it is an audio experience that people listen to to fall asleep. 
+    The Sleep Cast should follow these rules:
+    - It is a long, winding story. 
+    - It is told in the 2nd person, like it is happening to the person listening.
+    - It gently rhymes, with a comforting meter or feet.
+    - Imagine it is being read by someone with a deep, slow, comforting voice.
+    - It uses very simple vocabulary. It should be at a kindergarten level people don't have to think too hard while falling asleep.
+    - It describes things in more detail than normal. For example: "There was confetti all over the road. There was red, green, blue, purple, yellow, and white confetti."
+    - It uses excessive descriptions. For example: "The candle was lit, a bright yellow flickering flame was burning gently and fully in it's vanilla, off-white wax.
+    - It should be appropriate for people with afantasia. Don't ask someone to imagine or visualize something, because they can't.
+    
+    The Sleep Cast will consist of 5 chapters. I will request each chapter individually. 
+
+    Each Chapter should start with "Chapter <chapter number>: <chapter title>".
+    `
   });
 
   const fullStory = _.chain(sleepCastExecutionResult)
@@ -105,6 +115,8 @@ const main = async () => {
     .value()
 
   console.log({ sleepCastExecutionResult });
+
+  console.log(fullStory)
 
   // Start Text to Voice
 
